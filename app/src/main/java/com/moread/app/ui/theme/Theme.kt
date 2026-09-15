@@ -11,7 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
-private val InkPrimary = Color(0xFF3F51B5)
+private val InkPrimary = Color(0xFF4A5A78)
 private val LightScheme = lightColorScheme(
     primary = InkPrimary,
     secondary = Color(0xFF7986CB),
@@ -19,7 +19,7 @@ private val LightScheme = lightColorScheme(
     background = Color(0xFFFAFAF7),
 )
 private val DarkScheme = darkColorScheme(
-    primary = Color(0xFF9FA8DA),
+    primary = Color(0xFFA8B4CC),
     secondary = Color(0xFF5C6BC0),
 )
 
@@ -28,12 +28,7 @@ fun MoReadTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit,
 ) {
-    val context = LocalContext.current
-    val scheme = when {
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        darkTheme -> DarkScheme
-        else -> LightScheme
-    }
+    // 不用系统动态取色：阅读应用需要稳定、低饱和的墨色系，不随壁纸漂移
+    val scheme = if (darkTheme) DarkScheme else LightScheme
     MaterialTheme(colorScheme = scheme, content = content)
 }

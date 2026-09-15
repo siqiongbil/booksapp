@@ -30,8 +30,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Menu
@@ -202,10 +204,10 @@ fun BookshelfScreen(
                             enabled = selectedIds.isNotEmpty(),
                         ) { Icon(Icons.Filled.Delete, contentDescription = "删除所选") }
                     } else if (shelfTab == 0) {
-                        TextButton(
+                        IconButton(
                             onClick = { selectMode = true; selectedIds = emptySet() },
                             enabled = books.isNotEmpty(),
-                        ) { Text("管理") }
+                        ) { Icon(Icons.Filled.Checklist, contentDescription = "管理") }
                         IconButton(onClick = {
                             importLauncher.launch(
                                 arrayOf(
@@ -224,11 +226,9 @@ fun BookshelfScreen(
             )
         },
         bottomBar = {
-            NavigationBar(
-                // insets 交给 M3 默认处理（自动让位系统三键/手势条）；
-                // 之前手动 navigationBarsPadding 与 Scaffold 的 bottomBar insets 叠加成双重间隙
-                modifier = Modifier.height(64.dp),
-            ) {
+            // 高度与系统条让位全部交给 NavigationBar 默认实现（内容 80dp + insets 自适应），
+            // 任何固定高度都会在部分机型上被系统导航条挤成一条
+            NavigationBar {
                 NavigationBarItem(
                     selected = shelfTab == 0,
                     onClick = { shelfTab = 0 },
@@ -561,21 +561,17 @@ private fun EmptyLocal() {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Box(
-            Modifier
-                .height(84.dp)
-                .aspectRatio(1f)
-                .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(28.dp)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text("书", style = MaterialTheme.typography.headlineLarge,
-                color = MaterialTheme.colorScheme.onPrimaryContainer)
-        }
-        Spacer(Modifier.height(16.dp))
+        Icon(
+            Icons.AutoMirrored.Filled.MenuBook,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(56.dp),
+        )
+        Spacer(Modifier.height(12.dp))
         Text("书架空空如也", style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(8.dp))
         Text(
-            "点击右上角「导入书籍」加入第一本书\n支持 TXT（GBK/UTF-8/Big5）、EPUB、MOBI\n或到「线上书架」从 GitHub 拉取",
+            "右上角「导入书籍」，或到「线上书架」拉取\n支持 TXT / EPUB / MOBI / PDF / 漫画",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
