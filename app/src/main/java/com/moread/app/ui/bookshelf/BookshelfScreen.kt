@@ -225,9 +225,9 @@ fun BookshelfScreen(
         },
         bottomBar = {
             NavigationBar(
-                // 让出系统导航条（三键返回/主页或手势条）；自身高度仍为 64dp
-                modifier = Modifier.height(64.dp).navigationBarsPadding(),
-                windowInsets = androidx.compose.foundation.layout.WindowInsets(0.dp),
+                // insets 交给 M3 默认处理（自动让位系统三键/手势条）；
+                // 之前手动 navigationBarsPadding 与 Scaffold 的 bottomBar insets 叠加成双重间隙
+                modifier = Modifier.height(64.dp),
             ) {
                 NavigationBarItem(
                     selected = shelfTab == 0,
