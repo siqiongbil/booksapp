@@ -34,6 +34,13 @@ class ChapterSplitter {
             .sortedBy { it.sortOrder }
 
         val materialized = lines.toList()
+        // 智能嗅探优先：序号连续链质量过关则直接采用（对“乱七八糟”的章节标记最鲁棒）
+        SmartChapters.detect(materialized, totalChars)?.let { smart ->
+            return buildFromHeadings(
+                RulePattern(SmartChapters.RULE_ID, SmartChapters.RULE_NAME, Regex(".*"), TocLevel.CHAPTER, true, 0, false),
+                smart, totalChars, materialized, volumeRules,
+            )
+        }
         val candidates = chapterRules.mapNotNull { rule ->
             val headings = matchRule(materialized, rule)
             if (headings.size >= MIN_HEADINGS) rule to headings else null

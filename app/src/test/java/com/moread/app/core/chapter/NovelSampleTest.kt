@@ -28,8 +28,10 @@ class NovelSampleTest {
         }
         val (_, toc) = kotlinx.coroutines.runBlocking { com.moread.app.core.parser.TxtParser().parse(f, rules) }
         val n = toc.result.chapters.size
-        println("chapters=[$n] first=[${toc.result.chapters.first().title}] last=[${toc.result.chapters.last().title}]")
-        assertTrue("应识别出约 30 章，实际 $n", n in 25..60)
+        println("chapters=[$n] rule=[${toc.result.usedRuleName}] first=[${toc.result.chapters.first().title}] last=[${toc.result.chapters.last().title}]")
+        assertTrue("智能嗅探应生效，实际规则=${toc.result.usedRuleName}", toc.result.usedRuleName == "智能嗅探")
+        assertTrue("应识别出全部 51 条章目（含上/中/下分条），实际 $n", n in 45..55)
         assertTrue(toc.result.chapters.first().title.contains("第一章"))
+        assertTrue(toc.result.chapters.none { it.title.endsWith("，") || it.title.endsWith("。") })
     }
 }
