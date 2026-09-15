@@ -150,7 +150,7 @@ class ChapterSplitterTest {
     @Test
     fun `长篇无章标记按部分分段`() {
         val content = buildString {
-            repeat(220) { append(para(12)) } // 约 8.8 万字，超过整本单章上限
+            repeat(420) { append(para(12)) } // 约 8 万字，超过整本单章上限
         }
         val result = splitOf(content)
         assertTrue(result.fallbackBySize)
