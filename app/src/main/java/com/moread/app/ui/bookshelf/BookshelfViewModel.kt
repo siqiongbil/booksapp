@@ -55,9 +55,12 @@ class BookshelfViewModel(app: Application) : AndroidViewModel(app) {
     private val _importingCount = MutableStateFlow(0)
     val importingCount = _importingCount.asStateFlow()
 
-    /** 本地已存在的书：origin → bookId（线上行判定“已存”并取本地封面）。 */
+    /** 本地已入库的书（不含线上点读的临时会话）：origin → bookId（“已存”判定与本地封面）。
+     *  点读会话不进书架、不标“已存”；其行保留“缓存”按钮，点击即把临时副本转正入库。 */
     val savedOrigins = container.database.bookDao().observeAll()
-        .map { list -> list.mapNotNull { b -> b.origin?.let { it to b.id } }.toMap() }
+        .map { list ->
+            list.filter { !it.ephemeral }.mapNotNull { b -> b.origin?.let { it to b.id } }.toMap()
+        }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
     val githubSettings = container.gitSettings.flow
