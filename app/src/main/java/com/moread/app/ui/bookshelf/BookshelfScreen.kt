@@ -661,7 +661,7 @@ private fun BookList(
                     } else {
                         // 无封面（txt 等）：书名代替单字，市面阅读器样式
                         Text(
-                            book.title.trim().removePrefix("《").removeSuffix("》").take(9),
+                            com.moread.app.core.model.TitleCleaner.clean(book.title).take(9),
                             color = Color.White,
                             style = MaterialTheme.typography.titleSmall,
                             lineHeight = 18.sp,
@@ -1119,7 +1119,7 @@ private fun BookCard(
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    book.title.trim().removePrefix("《").removeSuffix("》").take(9),
+                    com.moread.app.core.model.TitleCleaner.clean(book.title).take(9),
                     color = Color.White,
                     style = MaterialTheme.typography.titleSmall,
                     lineHeight = 18.sp,
