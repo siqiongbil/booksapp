@@ -9,9 +9,6 @@ app/build/
 local.properties
 
 # 签名与机密（绝不入库）
-keystore/
-keystore.properties
-keystore_password.txt
 GitHub默认配置.txt
 
 # 测试与临时
