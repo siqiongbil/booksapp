@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.pager.HorizontalPager
@@ -247,7 +248,12 @@ fun ComicScreen(onBack: () -> Unit) {
                 AnimatedVisibility(visible = showMenu, modifier = Modifier.align(Alignment.BottomCenter)) {
                     Surface(color = Color(0xEE202020), shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)) {
                         var sliderPos by remember { mutableFloatStateOf(-1f) }
-                        Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp)) {
+                        Column(
+                            Modifier
+                                .fillMaxWidth()
+                                .navigationBarsPadding()
+                                .padding(horizontal = 20.dp, vertical = 6.dp),
+                        ) {
                             Slider(
                                 value = if (sliderPos >= 0) sliderPos else pagerState.currentPage.toFloat(),
                                 onValueChange = { sliderPos = it },

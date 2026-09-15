@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
@@ -224,7 +225,8 @@ fun BookshelfScreen(
         },
         bottomBar = {
             NavigationBar(
-                modifier = Modifier.height(64.dp),
+                // 让出系统导航条（三键返回/主页或手势条）；自身高度仍为 64dp
+                modifier = Modifier.height(64.dp).navigationBarsPadding(),
                 windowInsets = androidx.compose.foundation.layout.WindowInsets(0.dp),
             ) {
                 NavigationBarItem(

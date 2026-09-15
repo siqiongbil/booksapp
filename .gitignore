@@ -25,3 +25,10 @@ crash_log.txt
 .DS_Store
 Thumbs.db
 .zcode/
+
+# 误放的书籍文件不入库
+*.epub
+*.mobi
+*.pdf
+*.cbz
+cbr/
