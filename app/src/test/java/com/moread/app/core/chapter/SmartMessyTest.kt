@@ -49,6 +49,20 @@ class SmartMessyTest {
     }
 
     @Test
+    fun `连排标题止于破折号`() {
+        val paras = ArrayList<String>()
+        for (i in 1..4) {
+            paras += "第${listOf("一", "二", "三", "四")[i - 1]}章 高冷青梅的逐渐淫堕（${i}）——从宗门归来的天骄成熟美人道侣，竟然在书房被玩弄到阵阵喘息，正文极长"
+            paras += body("章$i")
+        }
+        val heads = SmartChapters.detect(build(paras), total(paras))!!
+        assertEquals(4, heads.size)
+        // 标题止于 ——，不得夹带正文
+        assertTrue(heads[0].title.endsWith("（1）"))
+        assertTrue(heads.none { it.title.contains("宗门归来") || it.title.contains("喘息") })
+    }
+
+    @Test
     fun `章标记与正文连排且含引用诱饵`() {
         val paras = ArrayList<String>()
         for (i in 1..5) {

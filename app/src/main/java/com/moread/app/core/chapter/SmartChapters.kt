@@ -43,6 +43,24 @@ object SmartChapters {
     /** 行首“第X章/节/回”前缀（不看行长）：标记与正文挤同一行的粗糙排版靠它识别。 */
     private val CHAPTER_PREFIX = Regex("^第[\\s　]*([0-9]+|[$CN]{1,12})[\\s　]*[章节回]")
 
+    /**
+     * 连排行的标题截取：章名止于首个破折号（——/--/—/－）或正文逗号句号，
+     * 最长 30 字。“第一章 高冷青梅（上）——从宗门归来的天骄…”→ 标题只取到（上）。
+     */
+    private fun mergedTitle(t: String): String {
+        var end = t.length
+        for (sep in listOf("——", "--", "—", "－")) {
+            val i = t.indexOf(sep)
+            if (i in 1 until end) end = i
+        }
+        for (c in "，。") {
+            val i = t.indexOf(c)
+            if (i in 1 until end) end = i
+        }
+        if (end > 30) end = 30
+        return t.take(end.coerceAtLeast(6)).trim()
+    }
+
     private data class Cand(val line: LineInfo, val text: String)
 
     /** 主入口：成功返回章标题列表（按文件顺序），不适合返回 null。 */
@@ -52,9 +70,9 @@ object SmartChapters {
             val t = line.text.trim()
             if (t.isEmpty()) continue
             if (CHAPTER_PREFIX.containsMatchIn(t.take(14))) {
-                // “第一章正文直接连排”：只要行首命中第X章/节/回前缀即算候选，
-                // 标题取前 24 字；正文里偶发的“第X章…”引用靠序号链 DP 剔除
-                cands += Cand(line, t.take(24))
+                // “第一章正文直接连排”：行首命中第X章/节/回前缀即算候选（不限行长）；
+                // 标题止于破折号/正文标点（源站常把首句正文挤在标题行里），正文引用靠序号链剔除
+                cands += Cand(line, mergedTitle(t))
                 continue
             }
             if (t.length !in 2..30) continue
