@@ -56,7 +56,9 @@ class ChapterSplitter {
     private fun matchRule(lines: List<LineInfo>, rule: RulePattern): List<Heading> {
         val out = ArrayList<Heading>()
         for (line in lines) {
-            val trimmed = line.text.trimEnd()
+            // 行首缩进（全角空格等）必须去掉：大量小说的章节标记带“　　第一章”式缩进，
+            // 否则 ^第 锚定的规则全部失配，整书退化为按字数强切
+            val trimmed = line.text.trim()
             if (trimmed.isEmpty()) continue
             if (trimmed.length > MAX_TITLE_LEN + 4) continue // 粗过滤，长行不可能是标题
             if (rule.regex.matches(trimmed)) {

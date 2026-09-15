@@ -32,3 +32,6 @@ Thumbs.db
 *.pdf
 *.cbz
 cbr/
+
+# 测试样本例外
+!app/src/test/resources/novel_sample.txt
