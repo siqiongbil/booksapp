@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
@@ -29,8 +30,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Menu
@@ -142,7 +145,11 @@ fun BookshelfScreen(
 
     val importLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenMultipleDocuments()
-    ) { uris -> vm.import(uris) }
+    ) { uris ->
+        vm.import(uris) { rejected ->
+            if (rejected > 0) toast = "已忽略 $rejected 个不支持的文件（支持 txt/epub/mobi/pdf/cbz/cbr）"
+        }
+    }
 
     androidx.compose.material3.ModalNavigationDrawer(
         drawerState = drawerState,
@@ -201,16 +208,19 @@ fun BookshelfScreen(
                             enabled = selectedIds.isNotEmpty(),
                         ) { Icon(Icons.Filled.Delete, contentDescription = "删除所选") }
                     } else if (shelfTab == 0) {
-                        TextButton(
+                        IconButton(
                             onClick = { selectMode = true; selectedIds = emptySet() },
                             enabled = books.isNotEmpty(),
-                        ) { Text("管理") }
+                        ) { Icon(Icons.Filled.Checklist, contentDescription = "管理") }
                         IconButton(onClick = {
+                            // 只放行书籍相关 MIME；octet-stream 会放行一切文件，去掉
                             importLauncher.launch(
                                 arrayOf(
-                                    "text/plain", "application/octet-stream", "text/*",
+                                    "text/plain",
                                     "application/epub+zip", "application/zip",
                                     "application/x-mobipocket-ebook", "application/vnd.amazon.ebook",
+                                    "application/pdf",
+                                    "application/vnd.comicbook+zip", "application/vnd.comicbook-rar",
                                 )
                             )
                         }) { Icon(Icons.Filled.Add, contentDescription = "导入书籍") }
@@ -223,8 +233,11 @@ fun BookshelfScreen(
             )
         },
         bottomBar = {
+            // 外层 Column 让位系统导航条（自适应）；内层栏固定矮高度（60dp），
+            // 两个职责分开，互不挤压
+            Column(Modifier.navigationBarsPadding()) {
             NavigationBar(
-                modifier = Modifier.height(64.dp),
+                modifier = Modifier.height(60.dp),
                 windowInsets = androidx.compose.foundation.layout.WindowInsets(0.dp),
             ) {
                 NavigationBarItem(
@@ -245,6 +258,7 @@ fun BookshelfScreen(
                     icon = { Icon(Icons.Filled.Settings, contentDescription = null) },
                     label = { Text("设置") },
                 )
+            }
             }
         },
     ) { padding ->
@@ -559,21 +573,12 @@ private fun EmptyLocal() {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Box(
-            Modifier
-                .height(84.dp)
-                .aspectRatio(1f)
-                .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(28.dp)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text("书", style = MaterialTheme.typography.headlineLarge,
-                color = MaterialTheme.colorScheme.onPrimaryContainer)
-        }
-        Spacer(Modifier.height(16.dp))
+        Text("📚", style = MaterialTheme.typography.displaySmall)
+        Spacer(Modifier.height(12.dp))
         Text("书架空空如也", style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(8.dp))
         Text(
-            "点击右上角「导入书籍」加入第一本书\n支持 TXT（GBK/UTF-8/Big5）、EPUB、MOBI\n或到「线上书架」从 GitHub 拉取",
+            "右上角「导入书籍」，或到「线上书架」拉取\n支持 TXT / EPUB / MOBI / PDF / 漫画",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,

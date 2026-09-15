@@ -25,3 +25,13 @@ crash_log.txt
 .DS_Store
 Thumbs.db
 .zcode/
+
+# 误放的书籍文件不入库
+*.epub
+*.mobi
+*.pdf
+*.cbz
+cbr/
+
+# 测试样本例外
+!app/src/test/resources/novel_sample.txt

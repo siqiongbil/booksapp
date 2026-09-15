@@ -34,6 +34,13 @@ class ChapterSplitter {
             .sortedBy { it.sortOrder }
 
         val materialized = lines.toList()
+        // 智能嗅探优先：序号连续链质量过关则直接采用（对“乱七八糟”的章节标记最鲁棒）
+        SmartChapters.detect(materialized, totalChars)?.let { smart ->
+            return buildFromHeadings(
+                RulePattern(SmartChapters.RULE_ID, SmartChapters.RULE_NAME, Regex(".*"), TocLevel.CHAPTER, true, 0, false),
+                smart, totalChars, materialized, volumeRules,
+            )
+        }
         val candidates = chapterRules.mapNotNull { rule ->
             val headings = matchRule(materialized, rule)
             if (headings.size >= MIN_HEADINGS) rule to headings else null
@@ -56,7 +63,9 @@ class ChapterSplitter {
     private fun matchRule(lines: List<LineInfo>, rule: RulePattern): List<Heading> {
         val out = ArrayList<Heading>()
         for (line in lines) {
-            val trimmed = line.text.trimEnd()
+            // 行首缩进（全角空格等）必须去掉：大量小说的章节标记带“　　第一章”式缩进，
+            // 否则 ^第 锚定的规则全部失配，整书退化为按字数强切
+            val trimmed = line.text.trim()
             if (trimmed.isEmpty()) continue
             if (trimmed.length > MAX_TITLE_LEN + 4) continue // 粗过滤，长行不可能是标题
             if (rule.regex.matches(trimmed)) {
