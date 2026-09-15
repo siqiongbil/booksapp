@@ -22,6 +22,9 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 
 class BookshelfViewModel(app: Application) : AndroidViewModel(app) {
+        private val SUPPORTED_IMPORT_EXTS =
+            setOf("txt", "epub", "mobi", "azw3", "azw", "prc", "pdf", "cbz", "cbr")
+
 
     private val container: AppContainer = (app as MoreadApp).container
 
@@ -315,11 +318,26 @@ class BookshelfViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun import(uris: List<Uri>) {
+    /** 导入：按真实文件名（DISPLAY_NAME）做扩展名校验，不支持的拒收。 */
+    fun import(uris: List<Uri>, onRejected: (Int) -> Unit = {}) {
         if (uris.isEmpty()) return
         viewModelScope.launch {
-            _importingCount.value += uris.size
+            val valid = ArrayList<Uri>(uris.size)
             for (uri in uris) {
+                val name = runCatching {
+                    getApplication<Application>().contentResolver.query(uri, null, null, null, null)
+                        ?.use { c ->
+                            val i = c.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                            if (i >= 0 && c.moveToFirst()) c.getString(i) else null
+                        }
+                }.getOrNull() ?: uri.toString().substringAfterLast('/')
+                val ext = name.substringAfterLast('.', "").lowercase()
+                if (ext in SUPPORTED_IMPORT_EXTS) valid += uri
+            }
+            onRejected(uris.size - valid.size)
+            if (valid.isEmpty()) return@launch
+            _importingCount.value += valid.size
+            for (uri in valid) {
                 runCatching { container.bookstore.importBook(uri) }
                 _importingCount.value -= 1
             }

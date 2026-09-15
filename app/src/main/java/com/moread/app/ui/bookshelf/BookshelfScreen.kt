@@ -145,7 +145,11 @@ fun BookshelfScreen(
 
     val importLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenMultipleDocuments()
-    ) { uris -> vm.import(uris) }
+    ) { uris ->
+        vm.import(uris) { rejected ->
+            if (rejected > 0) toast = "已忽略 $rejected 个不支持的文件（支持 txt/epub/mobi/pdf/cbz/cbr）"
+        }
+    }
 
     androidx.compose.material3.ModalNavigationDrawer(
         drawerState = drawerState,
@@ -209,11 +213,14 @@ fun BookshelfScreen(
                             enabled = books.isNotEmpty(),
                         ) { Icon(Icons.Filled.Checklist, contentDescription = "管理") }
                         IconButton(onClick = {
+                            // 只放行书籍相关 MIME；octet-stream 会放行一切文件，去掉
                             importLauncher.launch(
                                 arrayOf(
-                                    "text/plain", "application/octet-stream", "text/*",
+                                    "text/plain",
                                     "application/epub+zip", "application/zip",
                                     "application/x-mobipocket-ebook", "application/vnd.amazon.ebook",
+                                    "application/pdf",
+                                    "application/vnd.comicbook+zip", "application/vnd.comicbook-rar",
                                 )
                             )
                         }) { Icon(Icons.Filled.Add, contentDescription = "导入书籍") }
@@ -226,9 +233,13 @@ fun BookshelfScreen(
             )
         },
         bottomBar = {
-            // 高度与系统条让位全部交给 NavigationBar 默认实现（内容 80dp + insets 自适应），
-            // 任何固定高度都会在部分机型上被系统导航条挤成一条
-            NavigationBar {
+            // 外层 Column 让位系统导航条（自适应）；内层栏固定矮高度（60dp），
+            // 两个职责分开，互不挤压
+            Column(Modifier.navigationBarsPadding()) {
+            NavigationBar(
+                modifier = Modifier.height(60.dp),
+                windowInsets = androidx.compose.foundation.layout.WindowInsets(0.dp),
+            ) {
                 NavigationBarItem(
                     selected = shelfTab == 0,
                     onClick = { shelfTab = 0 },
@@ -247,6 +258,7 @@ fun BookshelfScreen(
                     icon = { Icon(Icons.Filled.Settings, contentDescription = null) },
                     label = { Text("设置") },
                 )
+            }
             }
         },
     ) { padding ->
@@ -561,12 +573,7 @@ private fun EmptyLocal() {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Icon(
-            Icons.AutoMirrored.Filled.MenuBook,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(56.dp),
-        )
+        Text("📚", style = MaterialTheme.typography.displaySmall)
         Spacer(Modifier.height(12.dp))
         Text("书架空空如也", style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(8.dp))
