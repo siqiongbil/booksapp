@@ -9,11 +9,13 @@ import com.moread.app.MoreadApp
 import com.moread.app.core.git.GitHubRepoRef
 import com.moread.app.core.git.RemoteFile
 import com.moread.app.data.db.BookEntity
+import com.moread.app.data.db.ProgressEntity
 import com.moread.app.data.prefs.GitHubSettings
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.joinAll
@@ -33,9 +35,22 @@ class BookshelfViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { container.bookstore.migrateEpubLayout() }
     }
 
-    val books = container.database.bookDao().observeAll()
-        .map { list -> list.filter { !it.ephemeral } }
+    val books = kotlinx.coroutines.flow.combine(
+        container.database.bookDao().observeAll(),
+        container.database.progressDao().observeAll(),
+    ) { all, progress -> sortShelf(all.filter { !it.ephemeral }, progress) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /** 市面排序：读过的按最近阅读时间置顶，未读的按加入时间倒序。 */
+    private fun sortShelf(books: List<BookEntity>, progress: List<ProgressEntity>): List<BookEntity> {
+        val lastRead = progress.associateBy { it.bookId } // progress 已按 updatedAt 倒序
+        val readOrder = progress.map { it.bookId }
+        return books.sortedWith(
+            compareByDescending<BookEntity> { it.id in lastRead.keys }
+                .thenBy { readOrder.indexOf(it.id).let { i -> if (i < 0) Int.MAX_VALUE else i } }
+                .thenByDescending { it.addedAt },
+        )
+    }
 
     private val _importingCount = MutableStateFlow(0)
     val importingCount = _importingCount.asStateFlow()

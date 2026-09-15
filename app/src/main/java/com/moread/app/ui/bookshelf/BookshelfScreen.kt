@@ -80,6 +80,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.moread.app.core.git.RemoteFile
 import com.moread.app.data.db.BookEntity
@@ -658,10 +659,16 @@ private fun BookList(
                             modifier = Modifier.fillMaxSize(),
                         )
                     } else {
+                        // 无封面（txt 等）：书名代替单字，市面阅读器样式
                         Text(
-                            coverInitial(book.title),
+                            book.title.trim().removePrefix("《").removeSuffix("》").take(9),
                             color = Color.White,
-                            style = MaterialTheme.typography.headlineLarge,
+                            style = MaterialTheme.typography.titleSmall,
+                            lineHeight = 18.sp,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
                         )
                     }
                     if (book.status == BookEntity.STATUS_PARSING) {
@@ -1112,9 +1119,14 @@ private fun BookCard(
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    coverInitial(book.title),
+                    book.title.trim().removePrefix("《").removeSuffix("》").take(9),
                     color = Color.White,
-                    style = MaterialTheme.typography.displayMedium,
+                    style = MaterialTheme.typography.titleSmall,
+                    lineHeight = 18.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
                 )
                 if (book.status == BookEntity.STATUS_PARSING) {
                     CircularProgressIndicator(

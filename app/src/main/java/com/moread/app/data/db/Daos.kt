@@ -46,6 +46,9 @@ interface ChapterDao {
 
 @Dao
 interface ProgressDao {
+    @Query("SELECT * FROM progress ORDER BY updatedAt DESC")
+    fun observeAll(): Flow<List<ProgressEntity>>
+
     @Query("SELECT * FROM progress WHERE bookId = :bookId")
     suspend fun get(bookId: Long): ProgressEntity?
 
