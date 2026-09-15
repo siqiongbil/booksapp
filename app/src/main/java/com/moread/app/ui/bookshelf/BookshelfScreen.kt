@@ -35,6 +35,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Refresh
@@ -114,6 +115,8 @@ fun BookshelfScreen(
     var selectMode by remember { mutableStateOf(false) }
     var selectedIds by remember { mutableStateOf(setOf<Long>()) }
     var showDeleteBooks by remember { mutableStateOf(false) }
+    var showPushBooks by remember { mutableStateOf(false) }
+    var pushBatchResult by remember { mutableStateOf<String?>(null) }
     var onlineFmt by remember { mutableStateOf("全部") }
     var toast by remember { mutableStateOf<String?>(null) }
     val drawerState = androidx.compose.material3.rememberDrawerState(androidx.compose.material3.DrawerValue.Closed)
@@ -141,6 +144,22 @@ fun BookshelfScreen(
     LaunchedEffect(shelfTab) {
         if (shelfTab == 1 && online.files.isEmpty() && !online.loading && online.error == null) {
             vm.refreshOnline()
+        }
+    }
+
+    // Android 13+：前台保活服务的通知需要运行时权限（拒绝也不影响下载，仅无通知）
+    val notifPerm = rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { }
+    val notifCtx = androidx.compose.ui.platform.LocalContext.current
+    fun ensureNotifPermission() {
+        val ctx = notifCtx
+        if (android.os.Build.VERSION.SDK_INT >= 33 &&
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                ctx, android.Manifest.permission.POST_NOTIFICATIONS,
+            ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            notifPerm.launch(android.Manifest.permission.POST_NOTIFICATIONS)
         }
     }
 
@@ -204,6 +223,10 @@ fun BookshelfScreen(
                             selectedIds = if (selectedIds.size == books.size) emptySet()
                             else books.map { it.id }.toSet()
                         }) { Text(if (selectedIds.size == books.size && books.isNotEmpty()) "全不选" else "全选") }
+                        IconButton(
+                            onClick = { if (selectedIds.isNotEmpty()) showPushBooks = true },
+                            enabled = selectedIds.isNotEmpty(),
+                        ) { Icon(Icons.Filled.CloudUpload, contentDescription = "推送到分享分支") }
                         IconButton(
                             onClick = { if (selectedIds.isNotEmpty()) showDeleteBooks = true },
                             enabled = selectedIds.isNotEmpty(),
@@ -309,6 +332,7 @@ fun BookshelfScreen(
                     },
                     onClearSelect = { selected = emptySet() },
                     onCacheSelected = { files ->
+                        ensureNotifPermission()
                         vm.cacheFiles(files) { ok, failed ->
                             toast = when {
                                 failed == 0 -> "已缓存 ${ok}/${files.size} 本到本地书架"
@@ -320,6 +344,7 @@ fun BookshelfScreen(
                     query = searchOnline,
                     onQuery = { searchOnline = it },
                     onPull = { file, cacheOnly ->
+                        if (cacheOnly) ensureNotifPermission()
                         vm.pullOnline(file, cacheOnly) { r ->
                             r.fold(
                                 onSuccess = { bookId ->
@@ -504,6 +529,33 @@ fun BookshelfScreen(
     }
     if (showGitSettings) {
         GithubSettingsDialog(vm = vm, onDismiss = { showGitSettings = false })
+    }
+    if (showPushBooks) {
+        AlertDialog(
+            onDismissRequest = { showPushBooks = false },
+            title = { Text("推送 ${selectedIds.size} 本到分享分支") },
+            text = { Text("将推送到默认仓库的 share 分支（不存在时自动创建），路径按格式归位。需要已配置带写权限的 PAT。") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showPushBooks = false
+                    val selected = books.filter { it.id in selectedIds }
+                    vm.pushBooksSelected(selected) { r ->
+                        pushBatchResult = r.fold(
+                            onSuccess = { "已推送 $it/${selected.size} 本到 share 分支" },
+                            onFailure = { "推送失败：${it.message}" },
+                        )
+                    }
+                }) { Text("推送") }
+            },
+            dismissButton = { TextButton(onClick = { showPushBooks = false }) { Text("取消") } },
+        )
+    }
+    pushBatchResult?.let {
+        LaunchedEffect(it) {
+            kotlinx.coroutines.delay(2500)
+            pushBatchResult = null
+        }
+        toast = it
     }
     if (showDeleteBooks) {
         AlertDialog(
@@ -996,7 +1048,7 @@ private fun RemoteBookRow(
                     .padding(horizontal = 12.dp),
             ) {
                 Text(
-                    file.path.substringAfterLast('/'),
+                    com.moread.app.core.model.TitleCleaner.clean(file.path.substringAfterLast('/').substringBeforeLast('.')),
                     style = MaterialTheme.typography.bodyLarge,
                     maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )

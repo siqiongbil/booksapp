@@ -363,6 +363,27 @@ class BookshelfViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { container.bookstore.deleteBook(book.id) }
     }
 
+    /** 批量推送选中书籍到默认仓库的 share 分支（分支自动创建），路径按扩展名归位。 */
+    fun pushBooksSelected(books: List<BookEntity>, onDone: (Result<Int>) -> Unit) {
+        githubAction({
+            val settings = container.gitSettings.snapshot()
+            val ref = com.moread.app.core.git.RepoUrlParser.parse(settings.defaultRepo)
+                ?: error("默认书库地址无效，请先到设置配置")
+            val api = container.buildGithubApi()
+            var ok = 0
+            for (b in books) {
+                runCatching {
+                    val fileName = b.filePath.substringAfterLast('/')
+                    val folder = fileName.substringAfterLast('.', "").lowercase().ifBlank { "txt" }
+                    container.bookstore.pushBookToGithub(
+                        api, b.id, ref, "$folder/$fileName", "MoRead 批量备份：$fileName", "share",
+                    ).getOrThrow()
+                }.onSuccess { ok++ }
+            }
+            ok
+        }) { r -> onDone(r) }
+    }
+
     /** 批量删除书（含本地文件/章节/进度/封面）。 */
     fun deleteBooks(ids: List<Long>) {
         viewModelScope.launch {

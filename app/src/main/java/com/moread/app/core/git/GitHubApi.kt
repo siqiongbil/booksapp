@@ -251,7 +251,7 @@ class GitHubApi(
                 if (resp.code != 206) return null
                 val total = resp.header("Content-Range")
                     ?.substringAfterLast('/')?.toLongOrNull() ?: return null
-                if (total <= 6L shl 20) return null
+                if (total <= 1L shl 20) return null // 1MB 以下整段；其余全走分段断点（慢网成功率）
                 val chunkSize = 4L shl 20
                 val out = java.io.ByteArrayOutputStream(total.toInt())
                 var pos = 0L

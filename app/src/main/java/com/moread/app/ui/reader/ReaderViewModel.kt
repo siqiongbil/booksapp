@@ -38,7 +38,7 @@ import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.roundToInt
 
 class ReaderViewModel(
-    app: Application,
+    private val app: Application,
     private val stateHandle: SavedStateHandle,
 ) : ViewModel() {
 
@@ -247,8 +247,22 @@ class ReaderViewModel(
     fun openToc() = _ui.update { it.copy(tocVisible = true, menuVisible = false, panel = 0) }
     fun closeToc() = _ui.update { it.copy(tocVisible = false) }
 
-    private fun typeface(): android.graphics.Typeface? =
-        if (prefs.fontFamily == 1) android.graphics.Typeface.SERIF else null
+    private var bundledSerif: android.graphics.Typeface? = null
+    private var bundledSerifTried = false
+
+    /** fontFamily==1 宋体：优先内置思源宋体子集（GB2312 6763 字），加载失败回落系统 serif。 */
+    private fun typeface(): android.graphics.Typeface? {
+        if (prefs.fontFamily != 1) return null
+        if (!bundledSerifTried) {
+            bundledSerifTried = true
+            bundledSerif = runCatching {
+                androidx.core.content.res.ResourcesCompat.getFont(
+                    app, com.moread.app.R.font.moserif,
+                )
+            }.getOrNull()
+        }
+        return bundledSerif ?: android.graphics.Typeface.SERIF
+    }
 
     private fun currentRatio(): Float {
         val total = chapters.sumOf { it.charCount }.coerceAtLeast(1)

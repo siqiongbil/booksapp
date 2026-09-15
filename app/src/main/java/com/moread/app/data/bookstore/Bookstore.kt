@@ -550,6 +550,7 @@ class Bookstore(
     suspend fun deleteBook(bookId: Long) = withContext(Dispatchers.IO) {
         val book = db.bookDao().getById(bookId) ?: return@withContext
         runCatching { File(book.filePath).delete() }
+        runCatching { File(context.filesDir, "covers/$bookId.img").delete() }
         db.chapterDao().deleteForBook(bookId)
         db.progressDao().delete(bookId)
         db.bookDao().delete(bookId)

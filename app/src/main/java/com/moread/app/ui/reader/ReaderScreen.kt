@@ -250,7 +250,7 @@ fun ReaderScreen(onBack: () -> Unit) {
                     }
                     Column(Modifier.weight(1f)) {
                         Text(
-                            ui.book?.title ?: "阅读",
+                            com.moread.app.core.model.TitleCleaner.clean(ui.book?.title ?: "阅读"),
                             style = MaterialTheme.typography.titleMedium,
                             maxLines = 1, overflow = TextOverflow.Ellipsis,
                         )
@@ -678,9 +678,30 @@ private fun ReaderTocDrawer(
             }
         }
         if (tab == 0) {
+            var tocQuery by remember { androidx.compose.runtime.mutableStateOf("") }
+            if (ui.chapters.size > 30) {
+                androidx.compose.material3.OutlinedTextField(
+                    value = tocQuery,
+                    onValueChange = { tocQuery = it },
+                    placeholder = { Text("搜索章节") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                )
+            }
+            val shown: List<Pair<Int, com.moread.app.data.db.ChapterEntity>> =
+                if (tocQuery.isBlank()) emptyList()
+                else ui.chapters.withIndex().filter { it.value.title.contains(tocQuery, true) }
+                    .map { it.index to it.value }
             LazyColumn(state = listState, modifier = Modifier.weight(1f)) {
-                itemsIndexed(ui.chapters, key = { _, c -> c.id }) { idx, chapter ->
-                    TocRow(chapter, idx == ui.chapterIndex) { onJump(idx) }
+                if (tocQuery.isBlank()) {
+                    itemsIndexed(ui.chapters, key = { _, c -> c.id }) { idx, chapter ->
+                        TocRow(chapter, idx == ui.chapterIndex) { onJump(idx) }
+                    }
+                } else {
+                    items(shown.size) { i ->
+                        val (idx, chapter) = shown[i]
+                        TocRow(chapter, idx == ui.chapterIndex) { onJump(idx) }
+                    }
                 }
             }
         } else {

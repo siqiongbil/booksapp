@@ -25,6 +25,8 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -182,6 +184,7 @@ fun ComicScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val view = LocalView.current
     var showMenu by remember { androidx.compose.runtime.mutableStateOf(false) }
+    var vertical by remember { androidx.compose.runtime.mutableStateOf(false) }
 
     BackHandler(enabled = showMenu) { showMenu = false }
 
@@ -213,8 +216,25 @@ fun ComicScreen(onBack: () -> Unit) {
                 LaunchedEffect(ui.page) {
                     if (pagerState.currentPage != ui.page) pagerState.scrollToPage(ui.page)
                 }
-                HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { idx ->
-                    ComicPage(vm = vm, name = ui.pages[idx], onTap = { showMenu = !showMenu })
+                if (!vertical) {
+                    HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { idx ->
+                        ComicPage(vm = vm, name = ui.pages[idx], onTap = { showMenu = !showMenu })
+                    }
+                }
+
+                // 纵向滚动模式（长条漫）：菜单里切换
+                if (vertical) {
+                    val vState = androidx.compose.foundation.lazy.rememberLazyListState(
+                        initialFirstVisibleItemIndex = ui.page.coerceIn(0, (ui.pages.size - 1).coerceAtLeast(0)),
+                    )
+                    androidx.compose.foundation.lazy.LazyColumn(state = vState, modifier = Modifier.fillMaxSize()) {
+                        items(ui.pages.size) { idx ->
+                            if (idx > 0) {
+                                vm.setPage(idx - 1) // 滚过上一张即记进度
+                            }
+                            ComicPage(vm = vm, name = ui.pages[idx], onTap = { showMenu = !showMenu })
+                        }
+                    }
                 }
 
                 // 顶栏
@@ -226,6 +246,14 @@ fun ComicScreen(onBack: () -> Unit) {
                         ) {
                             IconButton(onClick = onBack) {
                                 Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回", tint = Color.White)
+                            }
+                            IconButton(onClick = { vertical = !vertical }) {
+                                Icon(
+                                    if (vertical) androidx.compose.material.icons.Icons.Filled.SwapVert
+                                    else androidx.compose.material.icons.Icons.Filled.SwapHoriz,
+                                    contentDescription = if (vertical) "切换横向翻页" else "切换纵向滚动",
+                                    tint = Color.White,
+                                )
                             }
                             Text(
                                 ui.title,
@@ -287,8 +315,15 @@ private fun ComicPage(vm: ComicViewModel, name: String, onTap: () -> Unit) {
             .pointerInput(Unit) {
                 detectTransformGestures { _, pan, zoom, _ ->
                     val ns = (scale * zoom).coerceIn(1f, 5f)
-                    ox = if (ns > 1f) ox + pan.x else 0f
-                    oy = if (ns > 1f) oy + pan.y else 0f
+                    if (ns > 1f) {
+                        // 平移钳制在缩放余量内，图片不会被拖出屏幕
+                        val mx = (ns - 1f) * size.width / 2f
+                        val my = (ns - 1f) * size.height / 2f
+                        ox = (ox + pan.x).coerceIn(-mx, mx)
+                        oy = (oy + pan.y).coerceIn(-my, my)
+                    } else {
+                        ox = 0f; oy = 0f
+                    }
                     scale = ns
                 }
             }
