@@ -186,10 +186,20 @@ class ChapterSplitter {
         }
     }
 
-    /** 兜底：无任何规则命中时按字数在行边界强制分段。 */
+    /**
+     * 兜底：无任何章节标记的书。
+     * - ≤6 万字（短篇合集常见：整篇无结构）：整本一章“全文”，不打碎阅读
+     * - 更长的书：按 3 万字在行边界切“第 N 部分”（60k 是排版内存红线，3 万留足余量）
+     */
     private fun fallbackBySize(totalChars: Int, lines: List<LineInfo>): SplitResult {
         if (lines.isEmpty()) {
             return SplitResult(emptyList(), emptyList(), null, FALLBACK_NAME, true)
+        }
+        if (totalChars <= WHOLE_BOOK_MAX_CHARS) {
+            return SplitResult(
+                listOf(ChapterBound(0, "全文", 0, totalChars, totalChars, -1)),
+                emptyList(), null, FALLBACK_NAME, true,
+            )
         }
         val chapters = ArrayList<ChapterBound>()
         var segStart = 0
@@ -198,7 +208,7 @@ class ChapterSplitter {
             if (line.charOffset - segStart >= FALLBACK_CHARS && line.charOffset > segStart) {
                 chapters += ChapterBound(
                     index = segIndex,
-                    title = "第${segIndex + 1}段",
+                    title = "第${segIndex + 1}部分",
                     startOffset = segStart,
                     endOffset = line.charOffset,
                     charCount = line.charOffset - segStart,
@@ -211,7 +221,7 @@ class ChapterSplitter {
         if (segStart < totalChars) {
             chapters += ChapterBound(
                 index = segIndex,
-                title = "第${segIndex + 1}段",
+                title = "第${segIndex + 1}部分",
                 startOffset = segStart,
                 endOffset = totalChars,
                 charCount = totalChars - segStart,
@@ -237,7 +247,8 @@ class ChapterSplitter {
         const val PREFACE_TITLE = "正文之前"
         const val MIN_VOLUMES = 3
         const val MIN_CHAPTERS_PER_VOLUME = 3.0
-        const val FALLBACK_CHARS = 5_000
+        const val FALLBACK_CHARS = 30_000
+        const val WHOLE_BOOK_MAX_CHARS = 60_000
         const val FALLBACK_NAME = "按字数分段"
     }
 }

@@ -135,13 +135,27 @@ class ChapterSplitterTest {
     }
 
     @Test
-    fun `零命中按字数兜底`() {
+    fun `短篇无章标记整本一章`() {
         val content = buildString {
-            repeat(30) { append(para(12)) } // 约 30 * ~400 = 12000+ 字
+            repeat(30) { append(para(12)) } // 约 1.2 万字，无任何章节标记
         }
         val result = splitOf(content)
         assertTrue(result.fallbackBySize)
-        assertTrue(result.chapters.size >= 2)
+        assertEquals(1, result.chapters.size)
+        assertEquals("全文", result.chapters[0].title)
+        val (_, total) = LineScanner.fromString(content)
+        assertEquals(total, result.chapters.sumOf { it.charCount })
+    }
+
+    @Test
+    fun `长篇无章标记按部分分段`() {
+        val content = buildString {
+            repeat(220) { append(para(12)) } // 约 8.8 万字，超过整本单章上限
+        }
+        val result = splitOf(content)
+        assertTrue(result.fallbackBySize)
+        assertTrue("应切成多个部分，实际 ${result.chapters.size}", result.chapters.size in 2..5)
+        assertTrue(result.chapters[0].title.startsWith("第1部分"))
         val (_, total) = LineScanner.fromString(content)
         assertEquals(total, result.chapters.sumOf { it.charCount })
         for (i in 0 until result.chapters.size - 1) {
