@@ -808,6 +808,9 @@ private fun OnlineShelf(
     onQuery: (String) -> Unit,
 ) {
     Column(Modifier.fillMaxSize()) {
+        // 筛选结果供“全部缓存”与列表共用：搜索/格式过滤后点击只缓存筛出的这些
+        val filtered = state.files.filter { it.path.contains(query, true) }
+            .let { if (format == "全部") it else it.filter { f -> extOf(f.path).uppercase() == format } }
         SearchField(query, onQuery)
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
@@ -821,12 +824,15 @@ private fun OnlineShelf(
                     modifier = Modifier.weight(1f),
                 )
                 TextButton(
-                    onClick = { onCacheSelected(state.files) },
-                    enabled = !state.loading && state.files.isNotEmpty() && state.batchTotal == 0,
+                    onClick = { onCacheSelected(filtered) },
+                    enabled = !state.loading && filtered.isNotEmpty() && state.batchTotal == 0,
                 ) {
                     Text(
-                        if (state.batchTotal > 0) "全部缓存 ${state.batchDone}/${state.batchTotal}"
-                        else "全部缓存",
+                        when {
+                            state.batchTotal > 0 -> "全部缓存 ${state.batchDone}/${state.batchTotal}"
+                            filtered.size < state.files.size -> "缓存筛选 ${filtered.size} 本"
+                            else -> "全部缓存"
+                        },
                     )
                 }
             } else {
@@ -886,9 +892,6 @@ private fun OnlineShelf(
                 modifier = Modifier.fillMaxWidth().padding(24.dp),
             )
             else -> {
-                // 分类过滤在左侧抽屉；这里按当前格式过滤
-                val filtered = state.files.filter { it.path.contains(query, true) }
-                    .let { if (format == "全部") it else it.filter { f -> extOf(f.path).uppercase() == format } }
                 LazyColumn(Modifier.fillMaxSize()) {
                     items(filtered, key = { it.path }) { f ->
                         RemoteBookRow(

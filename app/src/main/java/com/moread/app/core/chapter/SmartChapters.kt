@@ -31,12 +31,17 @@ object SmartChapters {
         Regex("^(Chapter|CHAPTER|chapter)[\\s.·]*([0-9]+|[$CN]{1,10})[^，。；！？]{0,20}$"),
         // 12. / 12、 / 12： 标题
         Regex("^[0-9]{1,4}[、.．:：\\-—][^，。；！？、…]{1,24}$"),
+        // 一、二、三、（中文数字+顿号/点，无“第”前缀）
+        Regex("^[$CN]{1,6}[、．][^，。；！？、…]{0,24}$"),
         // （12）/(12)/【12】 纯编号行
         Regex("^[（(【\\[]([0-9]{1,4}|[$CN]{1,6})[）)】\\]]$"),
         // 序章/楔子/引子/终章/尾声/后记/番外
         Regex("^[序楔引][章记子言][^，。；！？]{0,16}$"),
         Regex("^(终章|尾章|尾声|完结|后记|完本感言|番外)[^，。；！？]{0,16}$"),
     )
+
+    /** 行首“第X章/节/回”前缀（不看行长）：标记与正文挤同一行的粗糙排版靠它识别。 */
+    private val CHAPTER_PREFIX = Regex("^第[\\s　]*([0-9]+|[$CN]{1,12})[\\s　]*[章节回]")
 
     private data class Cand(val line: LineInfo, val text: String)
 
@@ -45,6 +50,13 @@ object SmartChapters {
         val cands = ArrayList<Cand>()
         for (line in lines) {
             val t = line.text.trim()
+            if (t.isEmpty()) continue
+            if (CHAPTER_PREFIX.containsMatchIn(t.take(14))) {
+                // “第一章正文直接连排”：只要行首命中第X章/节/回前缀即算候选，
+                // 标题取前 24 字；正文里偶发的“第X章…”引用靠序号链 DP 剔除
+                cands += Cand(line, t.take(24))
+                continue
+            }
             if (t.length !in 2..30) continue
             if (TAIL_PUNCT.indexOf(t.last()) >= 0) continue
             if (FAMILIES.any { it.matches(t) }) cands += Cand(line, t)
@@ -99,6 +111,8 @@ object SmartChapters {
         Regex("^第[\\s　]*([0-9]+|[$CN]{1,12})").find(t)?.groupValues?.get(1)?.let { return num(it) }
         Regex("^(Chapter|CHAPTER|chapter)[\\s.·]*([0-9]+|[$CN]{1,10})", RegexOption.IGNORE_CASE)
             .find(t)?.groupValues?.get(2)?.let { return num(it) }
+        // 一、二、（中文数字+顿号/点）
+        Regex("^([$CN]{1,6})[、．]").find(t)?.groupValues?.get(1)?.let { return num(it) }
         Regex("^[（(【\\[]?([0-9]{1,4})[）)】\\]?、.．:：\\-—]").find(t)?.groupValues?.get(1)?.let { return it.toIntOrNull() }
         Regex("^[（(【\\[]([$CN]{1,6})[）)】\\]]$").find(t)?.groupValues?.get(1)?.let { return num(it) }
         return null
