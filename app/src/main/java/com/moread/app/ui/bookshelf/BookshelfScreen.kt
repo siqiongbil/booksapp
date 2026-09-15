@@ -818,7 +818,7 @@ private fun OnlineShelf(
         ) {
             if (selected.isEmpty()) {
                 Text(
-                    if (state.repoSlug.isNotBlank()) "${state.repoSlug} · ${state.files.size} 个文件" else "线上书库",
+                    if (state.repoSlug.isNotBlank()) "${state.repoSlug} · ${if (filtered.size < state.files.size) "${filtered.size}/${state.files.size}" else state.files.size} 个文件" else "线上书库",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.weight(1f),
