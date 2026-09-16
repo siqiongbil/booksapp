@@ -604,10 +604,17 @@ fun BookshelfScreen(
             dismissButton = { TextButton(onClick = { showPushBooks = false }) { Text("取消") } },
         )
     }
-    // 启动更新弹窗：检测到新版本时在任意页面弹出
+    // 启动更新弹窗：检测到新版本时在任意页面弹出（支持"不再提示"）
     val upd by vm.updateUi.collectAsState()
+    val readerPrefs by vm.readerPrefs.collectAsState()
     var updateDismissed by remember { mutableStateOf(false) }
-    if (!updateDismissed && upd.latest != null && vm.isNewer(upd.latest!!.tag, upd.current)) {
+    var noRemind by remember { mutableStateOf(false) }
+    val silencedTag = readerPrefs?.updateSilencedTag ?: ""
+    val shouldShowDialog = !updateDismissed &&
+        upd.latest != null &&
+        vm.isNewer(upd.latest!!.tag, upd.current) &&
+        upd.latest!!.tag != silencedTag // 同一版本不再弹
+    if (shouldShowDialog) {
         AlertDialog(
             onDismissRequest = { updateDismissed = true },
             title = { Text("发现新版本") },
@@ -624,16 +631,34 @@ fun BookshelfScreen(
                             )
                         }
                     }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(top = 12.dp),
+                    ) {
+                        androidx.compose.material3.Checkbox(
+                            checked = noRemind,
+                            onCheckedChange = { noRemind = it },
+                        )
+                        Text(
+                            "不再提示此版本",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             },
             confirmButton = {
                 TextButton(onClick = {
+                    if (noRemind) vm.silenceUpdate(upd.latest!!.tag)
                     updateDismissed = true
-                    shelfTab = 2 // 跳到设置页的版本行去点更新
+                    shelfTab = 2
                 }) { Text("去更新") }
             },
             dismissButton = {
-                TextButton(onClick = { updateDismissed = true }) { Text("稍后") }
+                TextButton(onClick = {
+                    if (noRemind) vm.silenceUpdate(upd.latest!!.tag)
+                    updateDismissed = true
+                }) { Text("稍后") }
             },
         )
     }

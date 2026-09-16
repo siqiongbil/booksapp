@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -30,6 +31,8 @@ class ReaderPrefs(private val context: Context) {
         val volumeKeyTurn: Boolean = true,
         /** 自动翻页间隔秒；0 关闭 */
         val autoPageSec: Int = 0,
+        /** 已忽略的更新版本标签（"不再提示"记录，新版本出现时重新弹窗） */
+        val updateSilencedTag: String = "",
     )
 
     val flow: Flow<Snapshot> = context.dataStore.data.map { p ->
@@ -45,6 +48,7 @@ class ReaderPrefs(private val context: Context) {
             brightness = p[KEY_BRIGHTNESS] ?: -1f,
             volumeKeyTurn = p[KEY_VOLUME_KEY] ?: true,
             autoPageSec = p[KEY_AUTO_PAGE] ?: 0,
+            updateSilencedTag = p[KEY_UPDATE_SILENCED] ?: "",
         )
     }
 
@@ -60,6 +64,8 @@ class ReaderPrefs(private val context: Context) {
     suspend fun setVolumeKeyTurn(on: Boolean) = context.dataStore.edit { it[KEY_VOLUME_KEY] = on }
     suspend fun setAutoPageSec(sec: Int) = context.dataStore.edit { it[KEY_AUTO_PAGE] = sec.coerceIn(0, 300) }
 
+    suspend fun setUpdateSilencedTag(tag: String) = context.dataStore.edit { it[KEY_UPDATE_SILENCED] = tag }
+
     private companion object {
         val KEY_THEME = intPreferencesKey("theme_id")
         val KEY_FONT = floatPreferencesKey("font_size_sp")
@@ -72,5 +78,6 @@ class ReaderPrefs(private val context: Context) {
         val KEY_BRIGHTNESS = floatPreferencesKey("brightness")
         val KEY_VOLUME_KEY = booleanPreferencesKey("volume_key_turn")
         val KEY_AUTO_PAGE = intPreferencesKey("auto_page_sec")
+        val KEY_UPDATE_SILENCED = stringPreferencesKey("update_silenced_tag")
     }
 }
