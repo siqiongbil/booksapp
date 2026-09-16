@@ -137,17 +137,37 @@ class GitHubApi(
     /** 最新 Release（含 .apk 附件）。无 Release / 无 APK 附件 / 无权限返回 null。 */
     suspend fun latestRelease(owner: String, repo: String): ReleaseInfo? = withContext(Dispatchers.IO) {
         runCatching {
-            val json = apiGet("/repos/$owner/$repo/releases/latest")
-            val root = org.json.JSONObject(json)
-            val arr = root.optJSONArray("assets") ?: return@runCatching null
-            for (i in 0 until arr.length()) {
-                val a = arr.optJSONObject(i) ?: continue
+            // 不用 /releases/latest（GitHub 内部排序有缓存怪癖），自己从列表取 semver 最大的正式版
+            val json = apiGet("/repos/$owner/$repo/releases?per_page=20", authAll = true)
+            val arr = org.json.JSONArray(json)
+            val formal = (0 until arr.length())
+                .mapNotNull { arr.optJSONObject(it) }
+                .filter { !it.optBoolean("prerelease") && !it.optBoolean("draft") }
+            var best: org.json.JSONObject? = null
+            var bestVer: List<Int>? = null
+            for (rel in formal) {
+                val ver = rel.optString("tag_name").removePrefix("v").split('.').map { it.toIntOrNull() ?: 0 }
+                val prev = bestVer
+                if (prev == null) {
+                    bestVer = ver; best = rel; continue
+                }
+                var newer = false
+                for (i in 0 until maxOf(ver.size, prev.size)) {
+                    val x = ver.getOrElse(i) { 0 }; val y = prev.getOrElse(i) { 0 }
+                    if (x != y) { newer = x > y; break }
+                }
+                if (newer) { bestVer = ver; best = rel }
+            }
+            val rel = best ?: return@runCatching null
+            val assets = rel.optJSONArray("assets") ?: return@runCatching null
+            for (i in 0 until assets.length()) {
+                val a = assets.optJSONObject(i) ?: continue
                 val name = a.optString("name")
                 if (name.endsWith(".apk", true)) {
                     return@runCatching ReleaseInfo(
-                        tag = root.optString("tag_name"),
-                        name = root.optString("name").ifBlank { null },
-                        notes = root.optString("body").ifBlank { null },
+                        tag = rel.optString("tag_name"),
+                        name = rel.optString("name").ifBlank { null },
+                        notes = rel.optString("body").ifBlank { null },
                         apkAssetId = a.optLong("id"),
                         apkName = name,
                         apkSize = a.optLong("size"),
@@ -169,14 +189,14 @@ class GitHubApi(
             .sortedBy { hostOf(it) != "api.github.com" }
         val errs = ArrayList<String>()
         for (base in chans) {
-            val auth = hostOf(base) == "api.github.com"
+            val auth = true // 更新附件全通道认证（只读令牌，走镜像无风险）
             try {
                 val req = Request.Builder()
                     .url("$base/repos/$owner/$repo/releases/assets/$assetId")
                     .headers(auth = auth)
                     .header("Accept", "application/octet-stream")
                     .get().build()
-                val c = if (auth) probeClient else client
+                val c = rawClient // 大文件下载用长超时客户端（300s），不能用 15s 的 probe
                 c.newCall(req).execute().use { resp ->
                     if (!resp.isSuccessful) throw IOException("HTTP ${resp.code}")
                     if (auth) goodApiBase = base
@@ -408,13 +428,13 @@ class GitHubApi(
     )
 
     /** API JSON 请求：设置线路 → gh-proxy → 直连，依次故障转移；成功的线路会记住。 */
-    private fun apiGet(path: String, isSuccess: (Int, String) -> Boolean = { c, _ -> c == 200 }): String {
+    private fun apiGet(path: String, isSuccess: (Int, String) -> Boolean = { c, _ -> c == 200 }, authAll: Boolean = false): String {
         var chans = (listOfNotNull(goodApiBase) + listOf(apiBase, ghProxyApi, directApi)).distinct()
         // 已配置 PAT：直连是唯一能访问私有仓库的线路，排最前（认证后限额 5000/h 也更宽裕）
         if (!patProvider().isNullOrBlank()) chans = chans.sortedBy { hostOf(it) != "api.github.com" }
         val errs = ArrayList<String>()
         for (base in chans) {
-            val direct = hostOf(base) == "api.github.com"
+            val direct = hostOf(base) == "api.github.com" || authAll
             val url = "$base$path"
             var last: IOException? = null
             repeat(2) { attempt ->
@@ -453,7 +473,7 @@ class GitHubApi(
         val direct = hostOf(base) == "api.github.com"
         val contentPath = "/repos/${ref.owner}/${ref.repo}/contents/${encPath(target)}"
         val existingSha = runCatching {
-            val text = apiGet(contentPath) { code, _ -> code == 200 || code == 404 }
+            val text = apiGet(contentPath, isSuccess = { code, _ -> code == 200 || code == 404 })
             GitHubJson.parseContentSha(text)
         }.getOrNull()
 

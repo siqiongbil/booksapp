@@ -70,6 +70,19 @@ class BookshelfViewModel(app: Application) : AndroidViewModel(app) {
     private val updateOwner = "siqiongbil"
     private val updateRepo = "booksapp"
 
+    companion object {
+        /**
+         * 更新专用只读 PAT：仅授权 siqiongbil/booksapp 的 Contents 读取。
+         * 与书库 PAT 完全独立——更新检测不依赖用户配置，开箱即用。
+         * 泄露无风险：只能读 Release 与仓库文件，无法写入。
+         */
+        private const val UPDATE_PAT =
+            "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"
+    }
+
+    /** 更新专用 API 实例：内置只读 PAT，与书库令牌无关。 */
+    private val updateApi = GitHubApi(patProvider = { UPDATE_PAT })
+
     data class UpdateUi(
         val current: String = com.moread.app.BuildConfig.VERSION_NAME,
         val latest: GitHubApi.ReleaseInfo? = null,
@@ -106,7 +119,8 @@ class BookshelfViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             _updateUi.value = _updateUi.value.copy(checking = true, error = null)
             val r = runCatching {
-                container.buildGithubApi().latestRelease(updateOwner, updateRepo)
+                val info = updateApi.latestRelease(updateOwner, updateRepo)
+                info
             }
             _updateUi.value = _updateUi.value.copy(
                 checking = false,
@@ -122,7 +136,7 @@ class BookshelfViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             _updateUi.value = _updateUi.value.copy(downloading = true, downloadPct = 0)
             val r = runCatching {
-                val bytes = container.buildGithubApi().downloadAsset(updateOwner, updateRepo, info.apkAssetId) { d, t ->
+                val bytes = updateApi.downloadAsset(updateOwner, updateRepo, info.apkAssetId) { d, t ->
                     _updateUi.value = _updateUi.value.copy(downloadPct = (d * 100 / t).toInt())
                 }
                 val dir = getApplication<Application>().getExternalFilesDir(null) ?: error("存储不可用")
