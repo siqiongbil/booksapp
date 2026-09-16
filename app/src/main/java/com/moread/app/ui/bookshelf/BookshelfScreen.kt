@@ -604,6 +604,40 @@ fun BookshelfScreen(
             dismissButton = { TextButton(onClick = { showPushBooks = false }) { Text("取消") } },
         )
     }
+    // 启动更新弹窗：检测到新版本时在任意页面弹出
+    val upd by vm.updateUi.collectAsState()
+    var updateDismissed by remember { mutableStateOf(false) }
+    if (!updateDismissed && upd.latest != null && vm.isNewer(upd.latest!!.tag, upd.current)) {
+        AlertDialog(
+            onDismissRequest = { updateDismissed = true },
+            title = { Text("发现新版本") },
+            text = {
+                Column {
+                    Text("v${upd.current} → ${upd.latest!!.tag.removePrefix("v")}")
+                    upd.latest!!.notes?.let { notes ->
+                        if (notes.isNotBlank()) {
+                            Text(
+                                notes.take(200),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(top = 8.dp),
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    updateDismissed = true
+                    shelfTab = 2 // 跳到设置页的版本行去点更新
+                }) { Text("去更新") }
+            },
+            dismissButton = {
+                TextButton(onClick = { updateDismissed = true }) { Text("稍后") }
+            },
+        )
+    }
+
     pushBatchResult?.let {
         LaunchedEffect(it) {
             kotlinx.coroutines.delay(2500)

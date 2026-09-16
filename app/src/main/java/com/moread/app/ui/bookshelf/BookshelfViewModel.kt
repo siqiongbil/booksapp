@@ -271,6 +271,37 @@ class BookshelfViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** 批量完成后发系统通知（后台用户也能看到结果）。 */
+    private fun notifyBatchComplete(title: String, text: String) {
+        runCatching {
+            val ctx = getApplication<Application>()
+            val nm = ctx.getSystemService(android.content.Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+            if (android.os.Build.VERSION.SDK_INT >= 26) {
+                nm.createNotificationChannel(
+                    android.app.NotificationChannel("batch_done", "缓存结果", android.app.NotificationManager.IMPORTANCE_DEFAULT),
+                )
+            }
+            val pi = android.app.PendingIntent.getActivity(
+                ctx, 0,
+                android.content.Intent(ctx, com.moread.app.MainActivity::class.java),
+                android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE,
+            )
+            val builder = if (android.os.Build.VERSION.SDK_INT >= 26) {
+                android.app.Notification.Builder(ctx, "batch_done")
+            } else {
+                @Suppress("DEPRECATION")
+                android.app.Notification.Builder(ctx)
+            }
+            nm.notify(2001, builder
+                .setContentTitle(title)
+                .setContentText(text)
+                .setSmallIcon(android.R.drawable.stat_sys_download_done)
+                .setContentIntent(pi)
+                .setAutoCancel(true)
+                .build())
+        }
+    }
+
     private fun setWorking(path: String, state: DlState?) {
         _online.value = _online.value.copy(
             working = _online.value.working.toMutableMap().apply {
@@ -351,6 +382,12 @@ class BookshelfViewModel(app: Application) : AndroidViewModel(app) {
             }
             jobs.joinAll()
             _online.value = _online.value.copy(batchTotal = 0, batchDone = 0)
+            // 后台完成的用户看不到 toast，发系统通知
+            if (failed == 0) {
+                notifyBatchComplete("缓存完成", "已缓存 ${ok} 本到本地书架")
+            } else {
+                notifyBatchComplete("缓存完成（部分失败）", "成功 ${ok} 本，失败 ${failed} 本")
+            }
             onDone(ok, failed)
         }
     }
