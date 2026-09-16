@@ -63,8 +63,12 @@ class KeepAliveService : Service() {
                 },
             )
         }
+        // SINGLE_TOP + REORDER_TO_FRONT：返回时复用已有 Activity，不创建新实例
+        // （新实例会创建新 ViewModelStore，导致旧 ViewModel 被清空、下载协程被杀）
+        val intent = Intent(this, MainActivity::class.java)
+        intent.flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
         val pi = PendingIntent.getActivity(
-            this, 0, Intent(this, MainActivity::class.java),
+            this, 0, intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         val builder = if (Build.VERSION.SDK_INT >= 26) {

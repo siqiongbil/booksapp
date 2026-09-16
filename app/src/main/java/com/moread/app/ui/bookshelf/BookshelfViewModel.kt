@@ -65,12 +65,21 @@ class BookshelfViewModel(app: Application) : AndroidViewModel(app) {
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
+    // ---- "不再提示"更新 ----
+    val readerPrefs = container.prefs.flow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    fun silenceUpdate(tag: String) = viewModelScope.launch {
+        container.prefs.setUpdateSilencedTag(tag)
+    }
+
     // ---- 应用更新 ----
     // 更新源 = 发布 Release 的代码仓库（硬编码，非机密）
     private val updateOwner = "siqiongbil"
     private val updateRepo = "booksapp"
 
     companion object {
+
         /**
          * 更新专用只读 PAT：仅授权 siqiongbil/booksapp 的 Contents 读取。
          * 与书库 PAT 完全独立——更新检测不依赖用户配置，开箱即用。
@@ -155,7 +164,9 @@ class BookshelfViewModel(app: Application) : AndroidViewModel(app) {
     private val _githubBusy = MutableStateFlow(false)
     val githubBusy = _githubBusy.asStateFlow()
 
-    /** 线上书架状态：默认仓库的文件列表 */
+    /** 线上书架状态：默认仓库的文件列表。
+     *  状态存 companion object（应用级），Activity 重建/ViewModel 重创建不丢——
+     *  否则后台返回时通知栏 Intent 若意外创建新 Activity 实例，下载进度全部归零。 */
     data class OnlineUi(
         val loading: Boolean = false,
         val error: String? = null,
@@ -173,7 +184,8 @@ class BookshelfViewModel(app: Application) : AndroidViewModel(app) {
         val failedPaths: Set<String> = emptySet(),
     )
 
-    private val _online = MutableStateFlow(OnlineUi())
+    private val _online get() = OnlineState._online
+    val online: StateFlow<OnlineUi> get() = OnlineState.online
     // 下载/解析活跃期间挂前台服务保活（通知常驻+唤醒锁），空闲即撤。
     // 必须作为 _online 之后的属性启动：init 块里 Main.immediate 协程会在
     // 构造期立刻执行，早于下方属性初始化 -> 空指针闪退。
@@ -184,7 +196,6 @@ class BookshelfViewModel(app: Application) : AndroidViewModel(app) {
             else com.moread.app.download.KeepAliveService.stop(app)
         }
     }
-    val online = _online.asStateFlow()
 
     /** 刷新线上书架（默认仓库）。 */
     fun refreshOnline() {
@@ -281,9 +292,10 @@ class BookshelfViewModel(app: Application) : AndroidViewModel(app) {
                     android.app.NotificationChannel("batch_done", "缓存结果", android.app.NotificationManager.IMPORTANCE_DEFAULT),
                 )
             }
+            val nIntent = android.content.Intent(ctx, com.moread.app.MainActivity::class.java)
+            nIntent.flags = android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP or android.content.Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
             val pi = android.app.PendingIntent.getActivity(
-                ctx, 0,
-                android.content.Intent(ctx, com.moread.app.MainActivity::class.java),
+                ctx, 0, nIntent,
                 android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE,
             )
             val builder = if (android.os.Build.VERSION.SDK_INT >= 26) {
@@ -527,4 +539,10 @@ class BookshelfViewModel(app: Application) : AndroidViewModel(app) {
     fun rename(bookId: Long, title: String) {
         viewModelScope.launch { container.bookstore.rename(bookId, title) }
     }
+}
+
+/** 应用级下载状态：Activity/ViewModel 重建不丢，后台返回时进度/排队态完整保留。 */
+private object OnlineState {
+    val _online = MutableStateFlow(BookshelfViewModel.OnlineUi())
+    val online: StateFlow<BookshelfViewModel.OnlineUi> = _online.asStateFlow()
 }
