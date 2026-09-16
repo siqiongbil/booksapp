@@ -409,6 +409,60 @@ fun BookshelfScreen(
                             }
                         }
                     }
+
+                    // ---- 版本与更新 ----
+                    androidx.compose.material3.HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text("版本", Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+                        val upd by vm.updateUi.collectAsState()
+                        LaunchedEffect(Unit) { vm.checkUpdate() } // 进入设置页刷新（5 分钟节流）
+                        val hasUpdate = upd.latest != null && vm.isNewer(upd.latest!!.tag, upd.current)
+                        when {
+                            upd.checking -> Text(
+                                "检查中…",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            upd.downloading -> Text(
+                                "下载中 ${upd.downloadPct}%",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                            hasUpdate -> Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    "${upd.current} → ${upd.latest!!.tag.removePrefix("v")}",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                val ctx2 = LocalContext.current
+                                TextButton(onClick = {
+                                    vm.downloadUpdate { r ->
+                                        r.onSuccess { f ->
+                                            runCatching {
+                                                val uri = androidx.core.content.FileProvider.getUriForFile(
+                                                    ctx2, ctx2.packageName + ".fileprovider", f,
+                                                )
+                                                val i = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+                                                    setDataAndType(uri, "application/vnd.android.package-archive")
+                                                    addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                                    addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                                }
+                                                ctx2.startActivity(i)
+                                            }.onFailure { toast = "无法拉起安装：${it.message}" }
+                                        }.onFailure { toast = "下载失败：${it.message}" }
+                                    }
+                                }) { Text("更新") }
+                            }
+                            else -> Text(
+                                upd.current,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
                     com.moread.app.ui.rules.RulesScreen(
                         onBack = { shelfTab = 0 },
                         showBack = false,

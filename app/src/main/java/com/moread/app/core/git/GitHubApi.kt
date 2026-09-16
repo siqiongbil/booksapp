@@ -124,6 +124,87 @@ class GitHubApi(
 
     // ---- 公开操作 ----
 
+    /** 应用更新源（发布 Release 的代码仓库，非书库）。 */
+    data class ReleaseInfo(
+        val tag: String,
+        val name: String?,
+        val notes: String?,
+        val apkAssetId: Long,
+        val apkName: String,
+        val apkSize: Long,
+    )
+
+    /** 最新 Release（含 .apk 附件）。无 Release / 无 APK 附件 / 无权限返回 null。 */
+    suspend fun latestRelease(owner: String, repo: String): ReleaseInfo? = withContext(Dispatchers.IO) {
+        runCatching {
+            val json = apiGet("/repos/$owner/$repo/releases/latest")
+            val root = org.json.JSONObject(json)
+            val arr = root.optJSONArray("assets") ?: return@runCatching null
+            for (i in 0 until arr.length()) {
+                val a = arr.optJSONObject(i) ?: continue
+                val name = a.optString("name")
+                if (name.endsWith(".apk", true)) {
+                    return@runCatching ReleaseInfo(
+                        tag = root.optString("tag_name"),
+                        name = root.optString("name").ifBlank { null },
+                        notes = root.optString("body").ifBlank { null },
+                        apkAssetId = a.optLong("id"),
+                        apkName = name,
+                        apkSize = a.optLong("size"),
+                    )
+                }
+            }
+            null
+        }.getOrNull()
+    }
+
+    /** 下载 Release 附件（私有库需 PAT，仅直连线路走认证）。 */
+    suspend fun downloadAsset(
+        owner: String,
+        repo: String,
+        assetId: Long,
+        onProgress: ((Long, Long) -> Unit)? = null,
+    ): ByteArray = withContext(Dispatchers.IO) {
+        val chans = (listOfNotNull(goodApiBase) + listOf(apiBase, ghProxyApi, directApi)).distinct()
+            .sortedBy { hostOf(it) != "api.github.com" }
+        val errs = ArrayList<String>()
+        for (base in chans) {
+            val auth = hostOf(base) == "api.github.com"
+            try {
+                val req = Request.Builder()
+                    .url("$base/repos/$owner/$repo/releases/assets/$assetId")
+                    .headers(auth = auth)
+                    .header("Accept", "application/octet-stream")
+                    .get().build()
+                val c = if (auth) probeClient else client
+                c.newCall(req).execute().use { resp ->
+                    if (!resp.isSuccessful) throw IOException("HTTP ${resp.code}")
+                    if (auth) goodApiBase = base
+                    val total = resp.body?.contentLength() ?: -1L
+                    val input = resp.body?.byteStream() ?: throw IOException("空响应体")
+                    val buf = ByteArray(1 shl 16)
+                    val out = java.io.ByteArrayOutputStream(maxOf(total.toInt(), 1 shl 16))
+                    var read = 0L
+                    var lastPct = -1
+                    while (true) {
+                        val n = input.read(buf)
+                        if (n < 0) break
+                        out.write(buf, 0, n)
+                        read += n
+                        if (onProgress != null && total > 0) {
+                            val pct = (read * 100 / total).toInt()
+                            if (pct != lastPct) { lastPct = pct; onProgress(read, total) }
+                        }
+                    }
+                    return@withContext out.toByteArray()
+                }
+            } catch (e: IOException) {
+                errs += "${hostOf(base)} ${e.message}"
+            }
+        }
+        throw IOException("附件下载失败：${errs.joinToString("；")}")
+    }
+
     /** branch 为空时解析仓库默认分支。 */
     suspend fun resolveBranch(ref: GitHubRepoRef): String = withContext(Dispatchers.IO) {
         ref.branch ?: run {

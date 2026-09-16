@@ -6,6 +6,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.moread.app.AppContainer
 import com.moread.app.MoreadApp
+import com.moread.app.core.git.GitHubApi
 import com.moread.app.core.git.GitHubRepoRef
 import com.moread.app.core.git.RemoteFile
 import com.moread.app.data.db.BookEntity
@@ -14,6 +15,7 @@ import com.moread.app.data.prefs.GitHubSettings
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -62,6 +64,76 @@ class BookshelfViewModel(app: Application) : AndroidViewModel(app) {
             list.filter { !it.ephemeral }.mapNotNull { b -> b.origin?.let { it to b.id } }.toMap()
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+
+    // ---- 应用更新 ----
+    // 更新源 = 发布 Release 的代码仓库（硬编码，非机密）
+    private val updateOwner = "siqiongbil"
+    private val updateRepo = "booksapp"
+
+    data class UpdateUi(
+        val current: String = com.moread.app.BuildConfig.VERSION_NAME,
+        val latest: GitHubApi.ReleaseInfo? = null,
+        val checking: Boolean = false,
+        val downloading: Boolean = false,
+        val downloadPct: Int = 0,
+        val apkFile: java.io.File? = null,
+        val error: String? = null,
+    )
+
+    private val _updateUi = MutableStateFlow(UpdateUi())
+    val updateUi: StateFlow<UpdateUi> = _updateUi.asStateFlow()
+    private var lastCheckAt = 0L
+
+    init {
+        checkUpdate(silent = true) // 进软件自动检测
+    }
+
+    /** 版本号比较：v1.10.0 > v1.9.1 */
+    fun isNewer(tag: String, current: String): Boolean {
+        fun p(v: String) = v.removePrefix("v").split('.').map { it.toIntOrNull() ?: 0 }
+        val a = p(tag); val b = p(current)
+        for (i in 0 until maxOf(a.size, b.size)) {
+            val x = a.getOrElse(i) { 0 }; val y = b.getOrElse(i) { 0 }
+            if (x != y) return x > y
+        }
+        return false
+    }
+
+    fun checkUpdate(force: Boolean = false, silent: Boolean = false) {
+        val now = System.currentTimeMillis()
+        if (!force && now - lastCheckAt < 5 * 60_000) return
+        lastCheckAt = now
+        viewModelScope.launch {
+            _updateUi.value = _updateUi.value.copy(checking = true, error = null)
+            val r = runCatching {
+                container.buildGithubApi().latestRelease(updateOwner, updateRepo)
+            }
+            _updateUi.value = _updateUi.value.copy(
+                checking = false,
+                latest = r.getOrNull(),
+                error = if (!silent) r.exceptionOrNull()?.message else null,
+            )
+        }
+    }
+
+    /** 下载更新 APK 到应用外部文件目录。 */
+    fun downloadUpdate(onDone: (Result<java.io.File>) -> Unit) {
+        val info = _updateUi.value.latest ?: return
+        viewModelScope.launch {
+            _updateUi.value = _updateUi.value.copy(downloading = true, downloadPct = 0)
+            val r = runCatching {
+                val bytes = container.buildGithubApi().downloadAsset(updateOwner, updateRepo, info.apkAssetId) { d, t ->
+                    _updateUi.value = _updateUi.value.copy(downloadPct = (d * 100 / t).toInt())
+                }
+                val dir = getApplication<Application>().getExternalFilesDir(null) ?: error("存储不可用")
+                val f = java.io.File(dir, info.apkName)
+                f.writeBytes(bytes)
+                f
+            }
+            _updateUi.value = _updateUi.value.copy(downloading = false, apkFile = r.getOrNull())
+            onDone(r)
+        }
+    }
 
     val githubSettings = container.gitSettings.flow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), GitHubSettings.Snapshot())
