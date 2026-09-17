@@ -173,9 +173,9 @@ fun ReaderScreen(onBack: () -> Unit) {
             .fillMaxSize()
             .background(theme.background)
     ) {
-        // 正文区：预留顶部信息栏空间
+        // 正文区：预留顶部信息栏空间（高度与信息栏一致）
         Column(Modifier.fillMaxSize()) {
-            Spacer(Modifier.fillMaxWidth().height(30.dp))
+            Spacer(Modifier.fillMaxWidth().height(36.dp))
 
             val marginH = ui.prefs.marginHDp.dp
             val marginV = ui.prefs.marginVDp.dp
@@ -185,7 +185,8 @@ fun ReaderScreen(onBack: () -> Unit) {
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
-                    .padding(horizontal = marginH, vertical = marginV)
+                    .padding(horizontal = marginH)
+                    .padding(top = 2.dp, bottom = marginV)
                 .onSizeChanged { size ->
                     if (size.width > 0 && size.height > 0) {
                         vm.setViewport(size.width, size.height, density.density)
@@ -214,13 +215,14 @@ fun ReaderScreen(onBack: () -> Unit) {
         )
         } // Column 结束
 
-        // 信息栏（Box 后置子级 = 绘制在 AndroidView 之上，不被自绘 Canvas 覆盖）
+        // 信息栏：固定高度 36dp，文字垂直居中——上下间距天然均匀
         Row(
             Modifier
                 .fillMaxWidth()
+                .height(36.dp)
                 .background(theme.background)
                 .align(Alignment.TopCenter)
-                .padding(horizontal = 16.dp, vertical = 6.dp),
+                .padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
