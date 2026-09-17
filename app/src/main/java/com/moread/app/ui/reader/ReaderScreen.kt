@@ -65,6 +65,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -172,14 +173,51 @@ fun ReaderScreen(onBack: () -> Unit) {
             .fillMaxSize()
             .background(theme.background)
     ) {
-        // 正文区（扣除边距后即为分页可用区域）
+        Column(Modifier.fillMaxSize()) {
+        // 顶部信息栏：书名 / 章节名 / 页码，始终可见，statusBarsPadding 让位刘海屏
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .background(theme.background)
+                .statusBarsPadding()
+                .padding(horizontal = 16.dp, vertical = 3.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                com.moread.app.core.model.TitleCleaner.clean(ui.book?.title ?: ""),
+                style = MaterialTheme.typography.labelSmall,
+                color = theme.dim,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(0.35f),
+            )
+            Text(
+                ui.chapters.getOrNull(ui.chapterIndex)?.title ?: "",
+                style = MaterialTheme.typography.labelSmall,
+                color = theme.dim,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.weight(0.4f),
+            )
+            Text(
+                "${ui.pageIndex + 1}/${ui.pageCount}",
+                style = MaterialTheme.typography.labelSmall,
+                color = theme.dim,
+                textAlign = TextAlign.End,
+                modifier = Modifier.weight(0.25f),
+            )
+        }
+
+        // 正文区（weight(1f) 自动扣除信息栏高度，onSizeChanged 报告正确可用空间）
         val marginH = ui.prefs.marginHDp.dp
         val marginV = ui.prefs.marginVDp.dp
         val density = LocalDensity.current
         AndroidView(
             factory = { ctx -> PageView(ctx) },
             modifier = Modifier
-                .fillMaxSize()
+                .weight(1f)
+                .fillMaxWidth()
                 .padding(horizontal = marginH, vertical = marginV)
                 .onSizeChanged { size ->
                     if (size.width > 0 && size.height > 0) {
@@ -207,6 +245,7 @@ fun ReaderScreen(onBack: () -> Unit) {
                 }
             },
         )
+        } // Column 结束（信息栏 + 正文区）
 
         if (ui.loading) {
             CircularProgressIndicator(Modifier.align(Alignment.Center), color = theme.dim)
