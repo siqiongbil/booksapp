@@ -173,43 +173,19 @@ fun ReaderScreen(onBack: () -> Unit) {
             .fillMaxSize()
             .background(theme.background)
     ) {
+        // 正文区：预留顶部信息栏空间
         Column(Modifier.fillMaxSize()) {
-        // 顶部信息栏：左章节名 · 右书名（无页码，右下角已有）；沉浸模式下全屏可用，不加 statusBarsPadding
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .background(theme.background)
-                .padding(horizontal = 16.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                ui.chapters.getOrNull(ui.chapterIndex)?.title ?: "…",
-                style = MaterialTheme.typography.labelSmall,
-                color = theme.dim,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
-            Spacer(Modifier.width(12.dp))
-            Text(
-                com.moread.app.core.model.TitleCleaner.clean(ui.book?.title ?: ""),
-                style = MaterialTheme.typography.labelSmall,
-                color = theme.dim,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
+            Spacer(Modifier.fillMaxWidth().height(30.dp))
 
-        // 正文区（weight(1f) 自动扣除信息栏高度，onSizeChanged 报告正确可用空间）
-        val marginH = ui.prefs.marginHDp.dp
-        val marginV = ui.prefs.marginVDp.dp
-        val density = LocalDensity.current
-        AndroidView(
-            factory = { ctx -> PageView(ctx) },
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .padding(horizontal = marginH, vertical = marginV)
+            val marginH = ui.prefs.marginHDp.dp
+            val marginV = ui.prefs.marginVDp.dp
+            val density = LocalDensity.current
+            AndroidView(
+                factory = { ctx -> PageView(ctx) },
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .padding(horizontal = marginH, vertical = marginV)
                 .onSizeChanged { size ->
                     if (size.width > 0 && size.height > 0) {
                         vm.setViewport(size.width, size.height, density.density)
@@ -236,7 +212,34 @@ fun ReaderScreen(onBack: () -> Unit) {
                 }
             },
         )
-        } // Column 结束（信息栏 + 正文区）
+        } // Column 结束
+
+        // 信息栏（Box 后置子级 = 绘制在 AndroidView 之上，不被自绘 Canvas 覆盖）
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .background(theme.background)
+                .align(Alignment.TopCenter)
+                .padding(horizontal = 16.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                ui.chapters.getOrNull(ui.chapterIndex)?.title ?: "…",
+                style = MaterialTheme.typography.bodySmall,
+                color = theme.text,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            Spacer(Modifier.width(12.dp))
+            Text(
+                com.moread.app.core.model.TitleCleaner.clean(ui.book?.title ?: ""),
+                style = MaterialTheme.typography.bodySmall,
+                color = theme.dim,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
 
         if (ui.loading) {
             CircularProgressIndicator(Modifier.align(Alignment.Center), color = theme.dim)
