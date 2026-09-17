@@ -174,38 +174,29 @@ fun ReaderScreen(onBack: () -> Unit) {
             .background(theme.background)
     ) {
         Column(Modifier.fillMaxSize()) {
-        // 顶部信息栏：书名 / 章节名 / 页码，始终可见，statusBarsPadding 让位刘海屏
+        // 顶部信息栏：左章节名 · 右书名（无页码，右下角已有）；沉浸模式下全屏可用，不加 statusBarsPadding
         Row(
             Modifier
                 .fillMaxWidth()
                 .background(theme.background)
-                .statusBarsPadding()
-                .padding(horizontal = 16.dp, vertical = 3.dp),
+                .padding(horizontal = 16.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            Text(
+                ui.chapters.getOrNull(ui.chapterIndex)?.title ?: "…",
+                style = MaterialTheme.typography.labelSmall,
+                color = theme.dim,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            Spacer(Modifier.width(12.dp))
             Text(
                 com.moread.app.core.model.TitleCleaner.clean(ui.book?.title ?: ""),
                 style = MaterialTheme.typography.labelSmall,
                 color = theme.dim,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(0.35f),
-            )
-            Text(
-                ui.chapters.getOrNull(ui.chapterIndex)?.title ?: "",
-                style = MaterialTheme.typography.labelSmall,
-                color = theme.dim,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.weight(0.4f),
-            )
-            Text(
-                "${ui.pageIndex + 1}/${ui.pageCount}",
-                style = MaterialTheme.typography.labelSmall,
-                color = theme.dim,
-                textAlign = TextAlign.End,
-                modifier = Modifier.weight(0.25f),
             )
         }
 
