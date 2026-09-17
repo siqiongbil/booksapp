@@ -501,6 +501,18 @@ class BookshelfViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { container.bookstore.deleteBook(book.id) }
     }
 
+    /** 批量重新分章（用当前规则+智能嗅探重新解析）。 */
+    fun reparseSelected(ids: List<Long>, onDone: (Int, Int) -> Unit) {
+        viewModelScope.launch {
+            var done = 0
+            for (id in ids) {
+                runCatching { container.bookstore.reparse(id) }
+                done++
+            }
+            onDone(done, ids.size)
+        }
+    }
+
     /** 批量推送选中书籍到默认仓库的 share 分支（分支自动创建），路径按扩展名归位。 */
     fun pushBooksSelected(books: List<BookEntity>, onDone: (Result<Int>) -> Unit) {
         githubAction({

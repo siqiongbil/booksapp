@@ -116,6 +116,7 @@ fun BookshelfScreen(
     var selectedIds by remember { mutableStateOf(setOf<Long>()) }
     var showDeleteBooks by remember { mutableStateOf(false) }
     var showPushBooks by remember { mutableStateOf(false) }
+    var showReparseBooks by remember { mutableStateOf(false) }
     var pushBatchResult by remember { mutableStateOf<String?>(null) }
     var onlineFmt by remember { mutableStateOf("全部") }
     var toast by remember { mutableStateOf<String?>(null) }
@@ -223,6 +224,10 @@ fun BookshelfScreen(
                             selectedIds = if (selectedIds.size == books.size) emptySet()
                             else books.map { it.id }.toSet()
                         }) { Text(if (selectedIds.size == books.size && books.isNotEmpty()) "全不选" else "全选") }
+                        IconButton(
+                            onClick = { if (selectedIds.isNotEmpty()) showReparseBooks = true },
+                            enabled = selectedIds.isNotEmpty(),
+                        ) { Icon(Icons.Filled.Refresh, contentDescription = "重新分章") }
                         IconButton(
                             onClick = { if (selectedIds.isNotEmpty()) showPushBooks = true },
                             enabled = selectedIds.isNotEmpty(),
@@ -583,6 +588,24 @@ fun BookshelfScreen(
     }
     if (showGitSettings) {
         GithubSettingsDialog(vm = vm, onDismiss = { showGitSettings = false })
+    }
+    if (showReparseBooks) {
+        AlertDialog(
+            onDismissRequest = { showReparseBooks = false },
+            title = { Text("重新分章 ${selectedIds.size} 本") },
+            text = { Text("将用当前规则重新解析选中书籍的章节结构（含智能嗅探）。阅读进度按比例恢复，已缓存文件不受影响。") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showReparseBooks = false
+                    vm.reparseSelected(selectedIds.toList()) { done, total ->
+                        toast = "已重新分章 $done/$total 本"
+                    }
+                    selectMode = false
+                    selectedIds = emptySet()
+                }) { Text("开始") }
+            },
+            dismissButton = { TextButton(onClick = { showReparseBooks = false }) { Text("取消") } },
+        )
     }
     if (showPushBooks) {
         AlertDialog(
